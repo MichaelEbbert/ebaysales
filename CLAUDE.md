@@ -61,10 +61,12 @@ The app automatically crops scans to the card dimensions:
 
 ### Image Condition Checking
 - Two upload buttons: "Upload" (free) and "Upload & Check Condition" (uses API)
-- Condition check uses Claude Vision API via Anthropic
+- Condition check uses Claude Sonnet via Anthropic API
 - Compares your selected grade against visual assessment
 - Flags corners, edges, surface issues, and centering
-- Cost: ~$0.01-0.02 per image
+- **Cost**: ~$0.003 per image (about 3 checks per penny, or ~330 checks per dollar)
+  - Based on actual usage: ~500 input tokens + ~70 output tokens per check
+  - Sonnet pricing: $3/M input, $15/M output
 
 ### Form Field Notes
 - **Card Name** (Sports): Use for extras like "RC", "/199", "Refractor", "Auto", "SP"
@@ -75,8 +77,9 @@ The app automatically crops scans to the card dimensions:
 
 ### API Accounts Required
 1. **Anthropic API** (console.anthropic.com) - For condition checking
-   - Pay-as-you-go, ~$0.01-0.02 per image
+   - Pay-as-you-go, ~$0.003 per image (~330 checks per dollar)
    - Key stored in `.env` file
+   - Check usage at console.anthropic.com → Usage
 
 2. **eBay Developer Account** (developer.ebay.com) - For posting/syncing
    - Free to register
