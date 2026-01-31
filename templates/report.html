@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Report - eBay Card Sales{% endblock %}
+
+{% block content %}
+<h1>Daily Action Report</h1>
+<p class="report-timestamp">Generated: {{ report.generated_at.strftime('%A, %B %d, %Y at %I:%M %p ET') }}</p>
+
+<div class="report-summary">
+    <h2>Summary</h2>
+    <ul>
+        <li><strong>{{ report.drafts_ready }}</strong> cards ready to list</li>
+        <li><strong>{{ report.active_count }}</strong> active auctions</li>
+        <li><strong>{{ report.payment_count }}</strong> awaiting payment</li>
+        <li><strong>{{ report.shipping_count }}</strong> need to ship</li>
+    </ul>
+</div>
+
+{% if report.needs_shipping %}
+<section class="report-section urgent">
+    <h2>ACTION REQUIRED: Ship These Items</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Buyer</th>
+                <th>Sale Price</th>
+                <th>Paid Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in report.needs_shipping %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>{{ listing.order.buyer_username if listing.order else 'Unknown' }}</td>
+                <td>${{ "%.2f"|format(listing.winning_bid or 0) }}</td>
+                <td>{{ listing.order.paid_at.strftime('%m/%d') if listing.order and listing.order.paid_at else 'N/A' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if report.awaiting_payment %}
+<section class="report-section warning">
+    <h2>Awaiting Payment</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Buyer</th>
+                <th>Winning Bid</th>
+                <th>Ended</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in report.awaiting_payment %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>{{ listing.order.buyer_username if listing.order else 'Unknown' }}</td>
+                <td>${{ "%.2f"|format(listing.winning_bid or 0) }}</td>
+                <td>{{ listing.actual_end_time.strftime('%m/%d') if listing.actual_end_time else 'N/A' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if report.active_auctions %}
+<section class="report-section">
+    <h2>Active Auctions</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Current Bid</th>
+                <th>Ends</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in report.active_auctions %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>${{ "%.2f"|format(listing.current_bid or listing.card.starting_bid) }}</td>
+                <td>{{ listing.scheduled_end_time.strftime('%a %m/%d %I:%M %p') if listing.scheduled_end_time else 'TBD' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if report.recently_shipped %}
+<section class="report-section">
+    <h2>Recently Shipped</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Tracking</th>
+                <th>Shipped Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in report.recently_shipped %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>{{ listing.order.tracking_number if listing.order else 'N/A' }}</td>
+                <td>{{ listing.order.shipped_at.strftime('%m/%d') if listing.order and listing.order.shipped_at else 'N/A' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if not report.needs_shipping and not report.awaiting_payment and not report.active_auctions %}
+<div class="empty-state">
+    <p>No action items today. <a href="{{ url_for('add_card') }}">Add a card</a> to get started.</p>
+</div>
+{% endif %}
+
+{% endblock %}

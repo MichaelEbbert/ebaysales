@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Card - eBay Card Sales{% endblock %}
+
+{% block content %}
+<h1>Edit Card</h1>
+
+<form method="post" class="card-form">
+    <div class="form-group">
+        <label for="card_type">Card Type</label>
+        <select name="card_type" id="card_type" required onchange="updateConditionOptions()">
+            <option value="sports" {% if card.card_type == 'sports' %}selected{% endif %}>Sports Card</option>
+            <option value="mtg" {% if card.card_type == 'mtg' %}selected{% endif %}>Magic: The Gathering</option>
+            <option value="pokemon" {% if card.card_type == 'pokemon' %}selected{% endif %}>Pokemon</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="name">Card Name</label>
+        <input type="text" name="name" id="name" required value="{{ card.name }}">
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="set_name">Set / Product</label>
+            <input type="text" name="set_name" id="set_name" value="{{ card.set_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="card_number">Card Number</label>
+            <input type="text" name="card_number" id="card_number" value="{{ card.card_number or '' }}">
+        </div>
+    </div>
+
+    <div class="form-row sports-only" {% if card.card_type != 'sports' %}style="display:none"{% endif %}>
+        <div class="form-group">
+            <label for="player_name">Player Name</label>
+            <input type="text" name="player_name" id="player_name" value="{{ card.player_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="year">Year</label>
+            <input type="text" name="year" id="year" value="{{ card.year or '' }}">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="is_graded" id="is_graded" {% if card.is_graded %}checked{% endif %} onchange="toggleGraded()">
+            This is a graded card
+        </label>
+    </div>
+
+    <div class="graded-options" {% if not card.is_graded %}style="display:none"{% endif %}>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="grading_company">Grading Company</label>
+                <select name="grading_company" id="grading_company">
+                    <option value="PSA" {% if card.grading_company == 'PSA' %}selected{% endif %}>PSA</option>
+                    <option value="BGS" {% if card.grading_company == 'BGS' %}selected{% endif %}>BGS</option>
+                    <option value="SGC" {% if card.grading_company == 'SGC' %}selected{% endif %}>SGC</option>
+                    <option value="CGC" {% if card.grading_company == 'CGC' %}selected{% endif %}>CGC</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="grade">Grade</label>
+                <input type="text" name="grade" id="grade" value="{{ card.grade or '' }}">
+            </div>
+        </div>
+    </div>
+
+    <div class="raw-condition" {% if card.is_graded %}style="display:none"{% endif %}>
+        <div class="form-group">
+            <label for="condition">Condition</label>
+            <select name="condition" id="condition">
+                {% if card.card_type == 'sports' %}
+                    <option value="NM" {% if card.condition == 'NM' %}selected{% endif %}>Near Mint (NM)</option>
+                    <option value="EX" {% if card.condition == 'EX' %}selected{% endif %}>Excellent (EX)</option>
+                    <option value="VG" {% if card.condition == 'VG' %}selected{% endif %}>Very Good (VG)</option>
+                    <option value="G" {% if card.condition == 'G' %}selected{% endif %}>Good (G)</option>
+                    <option value="P" {% if card.condition == 'P' %}selected{% endif %}>Poor (P)</option>
+                {% else %}
+                    <option value="NM" {% if card.condition == 'NM' %}selected{% endif %}>Near Mint (NM)</option>
+                    <option value="LP" {% if card.condition == 'LP' %}selected{% endif %}>Lightly Played (LP)</option>
+                    <option value="MP" {% if card.condition == 'MP' %}selected{% endif %}>Moderately Played (MP)</option>
+                    <option value="HP" {% if card.condition == 'HP' %}selected{% endif %}>Heavily Played (HP)</option>
+                    <option value="DMG" {% if card.condition == 'DMG' %}selected{% endif %}>Damaged (DMG)</option>
+                {% endif %}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="quantity">Quantity</label>
+            <select name="quantity" id="quantity">
+                <option value="1" {% if card.quantity == 1 %}selected{% endif %}>1x</option>
+                <option value="2" {% if card.quantity == 2 %}selected{% endif %}>2x</option>
+                <option value="3" {% if card.quantity == 3 %}selected{% endif %}>3x</option>
+                <option value="4" {% if card.quantity == 4 %}selected{% endif %}>4x</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="starting_bid">Starting Bid ($)</label>
+            <input type="number" name="starting_bid" id="starting_bid" value="{{ card.starting_bid }}" min="0.01" step="0.01">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="notes">Notes</label>
+        <textarea name="notes" id="notes" rows="3">{{ card.notes or '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="{{ url_for('list_cards') }}" class="btn">Cancel</a>
+    </div>
+</form>
+
+<script>
+function updateConditionOptions() {
+    const cardType = document.getElementById('card_type').value;
+    const conditionSelect = document.getElementById('condition');
+    const sportsOnlyFields = document.querySelectorAll('.sports-only');
+    const currentCondition = conditionSelect.value;
+
+    sportsOnlyFields.forEach(el => {
+        el.style.display = cardType === 'sports' ? 'flex' : 'none';
+    });
+
+    if (cardType === 'sports') {
+        conditionSelect.innerHTML = `
+            <option value="NM">Near Mint (NM)</option>
+            <option value="EX">Excellent (EX)</option>
+            <option value="VG">Very Good (VG)</option>
+            <option value="G">Good (G)</option>
+            <option value="P">Poor (P)</option>
+        `;
+    } else {
+        conditionSelect.innerHTML = `
+            <option value="NM">Near Mint (NM)</option>
+            <option value="LP">Lightly Played (LP)</option>
+            <option value="MP">Moderately Played (MP)</option>
+            <option value="HP">Heavily Played (HP)</option>
+            <option value="DMG">Damaged (DMG)</option>
+        `;
+    }
+
+    // Try to preserve selection
+    for (let option of conditionSelect.options) {
+        if (option.value === currentCondition) {
+            option.selected = true;
+            break;
+        }
+    }
+}
+
+function toggleGraded() {
+    const isGraded = document.getElementById('is_graded').checked;
+    document.querySelector('.graded-options').style.display = isGraded ? 'block' : 'none';
+    document.querySelector('.raw-condition').style.display = isGraded ? 'none' : 'block';
+}
+</script>
+{% endblock %}

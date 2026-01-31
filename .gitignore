@@ -1,0 +1,8 @@
+.env
+*.db
+uploads/
+__pycache__/
+*.pyc
+.claude/
+test_*.jpg
+nul

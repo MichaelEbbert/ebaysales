@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - eBay Card Sales{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="next-auction-end">
+    Next auction end time: <strong>{{ next_end_time.strftime('%A, %B %d at %I:%M %p ET') }}</strong>
+</div>
+
+<div class="status-grid">
+    <div class="status-card draft">
+        <div class="count">{{ counts.get('draft', 0) }}</div>
+        <div class="label">Drafts</div>
+    </div>
+    <div class="status-card listed">
+        <div class="count">{{ counts.get('listed', 0) }}</div>
+        <div class="label">Active</div>
+    </div>
+    <div class="status-card ended_sold">
+        <div class="count">{{ counts.get('ended_sold', 0) }}</div>
+        <div class="label">Awaiting Payment</div>
+    </div>
+    <div class="status-card paid">
+        <div class="count">{{ counts.get('paid', 0) }}</div>
+        <div class="label">Needs Shipping</div>
+    </div>
+    <div class="status-card shipped">
+        <div class="count">{{ counts.get('shipped', 0) }}</div>
+        <div class="label">Shipped</div>
+    </div>
+</div>
+
+{% if paid_unshipped %}
+<section class="action-section urgent">
+    <h2>Needs Shipping ({{ paid_unshipped|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Sold For</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in paid_unshipped %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>${{ "%.2f"|format(listing.winning_bid or 0) }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('update_listing_status', listing_id=listing.id) }}" style="display:inline">
+                        <input type="hidden" name="status" value="shipped">
+                        <button type="submit" class="btn btn-small">Mark Shipped</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if sold_unpaid %}
+<section class="action-section warning">
+    <h2>Awaiting Payment ({{ sold_unpaid|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Winning Bid</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in sold_unpaid %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>${{ "%.2f"|format(listing.winning_bid or 0) }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('update_listing_status', listing_id=listing.id) }}" style="display:inline">
+                        <input type="hidden" name="status" value="paid">
+                        <button type="submit" class="btn btn-small">Mark Paid</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if active %}
+<section class="action-section">
+    <h2>Active Auctions ({{ active|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Current Bid</th>
+                <th>Ends</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in active %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>${{ "%.2f"|format(listing.current_bid or listing.card.starting_bid) }}</td>
+                <td>{{ listing.scheduled_end_time.strftime('%a %I:%M %p') if listing.scheduled_end_time else 'TBD' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if drafts %}
+<section class="action-section">
+    <h2>Ready to List ({{ drafts|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Starting Bid</th>
+                <th>Scheduled End</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in drafts %}
+            <tr>
+                <td>{{ listing.card.title() }}</td>
+                <td>${{ "%.2f"|format(listing.card.starting_bid) }}</td>
+                <td>{{ listing.scheduled_end_time.strftime('%a %b %d %I:%M %p') if listing.scheduled_end_time else 'TBD' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% endblock %}
