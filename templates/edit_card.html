@@ -15,20 +15,23 @@
         </select>
     </div>
 
-    <div class="form-group">
-        <label for="name">Card Name</label>
-        <input type="text" name="name" id="name" required value="{{ card.name }}">
-    </div>
-
     <div class="form-row">
         <div class="form-group">
             <label for="set_name">Set / Product</label>
             <input type="text" name="set_name" id="set_name" value="{{ card.set_name or '' }}">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="card_number_group" {% if card.card_type == 'mtg' %}style="display:none"{% endif %}>
             <label for="card_number">Card Number</label>
             <input type="text" name="card_number" id="card_number" value="{{ card.card_number or '' }}">
         </div>
+    </div>
+
+    <div class="form-group tcg-only" {% if card.card_type == 'sports' %}style="display:none"{% endif %}>
+        <label for="foil">Foil</label>
+        <select name="foil" id="foil">
+            <option value="non-foil" {% if not card.foil or card.foil == 'non-foil' %}selected{% endif %}>Non-Foil</option>
+            <option value="foil" {% if card.foil == 'foil' %}selected{% endif %}>Foil</option>
+        </select>
     </div>
 
     <div class="form-row sports-only" {% if card.card_type != 'sports' %}style="display:none"{% endif %}>
@@ -105,8 +108,58 @@
     </div>
 
     <div class="form-group">
-        <label for="notes">Notes</label>
-        <textarea name="notes" id="notes" rows="3">{{ card.notes or '' }}</textarea>
+        <label for="name">Additional Details</label>
+        <input type="text" name="name" id="name" value="{{ card.name }}">
+    </div>
+
+    <div class="form-group">
+        <label for="notes">Public Notes</label>
+        <textarea name="notes" id="notes" rows="2">{{ card.notes or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="private_notes">Private Notes</label>
+        <textarea name="private_notes" id="private_notes" rows="2">{{ card.private_notes or '' }}</textarea>
+    </div>
+
+    <div class="image-upload-section">
+        <h3>Card Images</h3>
+
+        <div class="image-upload-row">
+            <div class="image-upload-box" id="front-upload-box">
+                <label>Front of Card</label>
+                {% if card.image_front %}
+                <div class="current-image">
+                    <img src="{{ url_for('uploaded_file', filename=card.image_front) }}" alt="Front">
+                </div>
+                {% endif %}
+                <input type="file" id="image_front_file" accept=".jpg,.jpeg,.png,.tif,.tiff">
+                <input type="hidden" name="image_front" id="image_front" value="{{ card.image_front or '' }}">
+                <div class="upload-buttons">
+                    <button type="button" class="btn btn-small" onclick="uploadImage('front', false)">Upload</button>
+                    <button type="button" class="btn btn-small btn-primary" onclick="uploadImage('front', true)">Upload & Check Condition</button>
+                </div>
+                <div class="upload-status" id="front-status"></div>
+                <div class="condition-result" id="front-condition"></div>
+            </div>
+
+            <div class="image-upload-box" id="back-upload-box">
+                <label>Back of Card</label>
+                {% if card.image_back %}
+                <div class="current-image">
+                    <img src="{{ url_for('uploaded_file', filename=card.image_back) }}" alt="Back">
+                </div>
+                {% endif %}
+                <input type="file" id="image_back_file" accept=".jpg,.jpeg,.png,.tif,.tiff">
+                <input type="hidden" name="image_back" id="image_back" value="{{ card.image_back or '' }}">
+                <div class="upload-buttons">
+                    <button type="button" class="btn btn-small" onclick="uploadImage('back', false)">Upload</button>
+                    <button type="button" class="btn btn-small btn-primary" onclick="uploadImage('back', true)">Upload & Check Condition</button>
+                </div>
+                <div class="upload-status" id="back-status"></div>
+                <div class="condition-result" id="back-condition"></div>
+            </div>
+        </div>
     </div>
 
     <div class="form-actions">
@@ -120,11 +173,22 @@ function updateConditionOptions() {
     const cardType = document.getElementById('card_type').value;
     const conditionSelect = document.getElementById('condition');
     const sportsOnlyFields = document.querySelectorAll('.sports-only');
+    const tcgOnlyFields = document.querySelectorAll('.tcg-only');
+    const cardNumberGroup = document.getElementById('card_number_group');
     const currentCondition = conditionSelect.value;
 
+    // Show/hide sports-specific fields
     sportsOnlyFields.forEach(el => {
         el.style.display = cardType === 'sports' ? 'flex' : 'none';
     });
+
+    // Show/hide TCG-specific fields (MTG and Pokemon)
+    tcgOnlyFields.forEach(el => {
+        el.style.display = (cardType === 'mtg' || cardType === 'pokemon') ? 'block' : 'none';
+    });
+
+    // Hide card number field for MTG
+    cardNumberGroup.style.display = cardType === 'mtg' ? 'none' : 'block';
 
     if (cardType === 'sports') {
         conditionSelect.innerHTML = `
@@ -157,6 +221,69 @@ function toggleGraded() {
     const isGraded = document.getElementById('is_graded').checked;
     document.querySelector('.graded-options').style.display = isGraded ? 'block' : 'none';
     document.querySelector('.raw-condition').style.display = isGraded ? 'none' : 'block';
+}
+
+async function uploadImage(side, checkCondition) {
+    const fileInput = document.getElementById(`image_${side}_file`);
+    const statusDiv = document.getElementById(`${side}-status`);
+    const conditionDiv = document.getElementById(`${side}-condition`);
+    const hiddenInput = document.getElementById(`image_${side}`);
+
+    if (!fileInput.files[0]) {
+        statusDiv.innerHTML = '<span class="error">Please select an image first</span>';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', fileInput.files[0]);
+    formData.append('side', side);
+    formData.append('card_type', document.getElementById('card_type').value || 'trading card');
+
+    if (checkCondition) {
+        const conditionSelect = document.getElementById('condition');
+        const isGraded = document.getElementById('is_graded').checked;
+        let condition = '';
+        if (isGraded) {
+            const company = document.getElementById('grading_company').value;
+            const grade = document.getElementById('grade').value;
+            condition = `${company} ${grade}`;
+        } else {
+            condition = conditionSelect.value;
+        }
+        formData.append('condition', condition);
+    }
+
+    statusDiv.innerHTML = '<span class="loading">Uploading...</span>';
+    conditionDiv.innerHTML = '';
+
+    const endpoint = checkCondition ? '/api/check-condition' : '/api/upload-image';
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            hiddenInput.value = result.filename;
+            statusDiv.innerHTML = '<span class="success">Uploaded: ' + result.filename + '</span>';
+
+            if (result.condition_check) {
+                conditionDiv.innerHTML = '<div class="condition-assessment"><strong>Condition Assessment:</strong><br>' +
+                    result.condition_check.replace(/\n/g, '<br>') + '</div>';
+            } else if (result.warning) {
+                conditionDiv.innerHTML = '<div class="condition-warning">' + result.warning + '</div>';
+            } else if (result.error) {
+                conditionDiv.innerHTML = '<div class="condition-error">' + result.error + '</div>';
+            }
+        } else {
+            statusDiv.innerHTML = '<span class="error">Error: ' + result.error + '</span>';
+        }
+    } catch (err) {
+        statusDiv.innerHTML = '<span class="error">Upload failed: ' + err.message + '</span>';
+    }
 }
 </script>
 {% endblock %}

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from models import db, Card, Listing, Order
 from datetime import datetime, timedelta
 from dateutil import tz
@@ -10,8 +10,74 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
+import json
+import time
 
 load_dotenv()
+
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
+
+
+def load_settings():
+    """Load settings from JSON file."""
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return get_default_settings()
+
+
+def save_settings(settings):
+    """Save settings to JSON file."""
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=4)
+
+
+def get_default_settings():
+    """Return default settings."""
+    return {
+        "shipping_options": [
+            {"name": "Economy", "method": "Stamped envelope", "tracking": False,
+             "insurance": False, "insurance_limit": None, "price": 1.00, "cost": 0.75,
+             "label_size": None, "packing": "#10 envelope with top loader and cardboard stiffener"},
+            {"name": "Standard", "method": "Bubble mailer", "tracking": True,
+             "insurance": False, "insurance_limit": None, "price": 4.50, "cost": 4.00,
+             "label_size": "4\" x 6\"", "packing": "Bubble mailer with top loader and ding protector"},
+            {"name": "Insured (up to $100)", "method": "Bubble mailer", "tracking": True,
+             "insurance": True, "insurance_limit": 100, "price": 6.50, "cost": 4.90,
+             "label_size": "4\" x 6\"", "packing": "Bubble mailer with top loader and ding protector"},
+            {"name": "Insured (up to $250)", "method": "Bubble mailer", "tracking": True,
+             "insurance": True, "insurance_limit": 250, "price": 8.50, "cost": 5.75,
+             "label_size": "4\" x 6\"", "packing": "Bubble mailer with top loader and ding protector"},
+        ],
+        "shipping_thresholds": {
+            "economy_max": 19.99,
+            "standard_max": 49.99,
+            "insured_100_max": 99.99
+        }
+    }
+
+
+def get_shipping_options():
+    """Get shipping options from settings."""
+    settings = load_settings()
+    return settings.get('shipping_options', get_default_settings()['shipping_options'])
+
+
+def get_recommended_shipping(sale_price):
+    """Get recommended shipping option based on sale price."""
+    settings = load_settings()
+    thresholds = settings.get('shipping_thresholds', get_default_settings()['shipping_thresholds'])
+    options = settings.get('shipping_options', get_default_settings()['shipping_options'])
+
+    if sale_price >= thresholds['insured_100_max'] + 0.01:
+        return options[3] if len(options) > 3 else options[-1]  # Insured $250
+    elif sale_price >= thresholds['standard_max'] + 0.01:
+        return options[2] if len(options) > 2 else options[-1]  # Insured $100
+    elif sale_price >= thresholds['economy_max'] + 0.01:
+        return options[1] if len(options) > 1 else options[-1]  # Standard
+    else:
+        return options[0]  # Economy
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -76,14 +142,25 @@ def auto_crop_card(filepath):
 EASTERN = tz.gettz('America/New_York')
 
 
-def get_next_saturday_11pm():
-    """Calculate the next Saturday at 11:00 PM Eastern."""
+def get_next_auction_end_time():
+    """Calculate the next auction end time (11:00 PM Eastern, at least 120 hours away)."""
     now = datetime.now(EASTERN)
-    days_until_saturday = (5 - now.weekday()) % 7
-    if days_until_saturday == 0 and now.hour >= 23:
-        days_until_saturday = 7
-    next_saturday = now + timedelta(days=days_until_saturday)
-    return next_saturday.replace(hour=23, minute=0, second=0, microsecond=0)
+    min_end_time = now + timedelta(hours=120)  # At least 5 days from now
+
+    # Start from today at 11pm and find the next 11pm that's >= 120 hours away
+    candidate = now.replace(hour=23, minute=0, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+
+    while candidate < min_end_time:
+        candidate += timedelta(days=1)
+
+    return candidate
+
+
+def get_next_saturday_11pm():
+    """Calculate the next Saturday at 11:00 PM Eastern (legacy, now uses get_next_auction_end_time)."""
+    return get_next_auction_end_time()
 
 
 def get_status_counts():
@@ -92,6 +169,12 @@ def get_status_counts():
     for status in ['draft', 'scheduled', 'listed', 'ended_sold', 'paid', 'shipped']:
         counts[status] = Listing.query.filter_by(status=status).count()
     return counts
+
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    """Serve uploaded images."""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
 @app.route('/')
@@ -140,7 +223,11 @@ def add_card():
             quantity=int(request.form.get('quantity', 1)),
             starting_bid=float(request.form.get('starting_bid', 0.50)),
             notes=request.form.get('notes'),
+            private_notes=request.form.get('private_notes'),
+            foil=request.form.get('foil'),
             is_graded=is_graded,
+            image_front=request.form.get('image_front'),
+            image_back=request.form.get('image_back'),
         )
 
         if is_graded:
@@ -183,7 +270,15 @@ def edit_card(card_id):
         card.quantity = int(request.form.get('quantity', 1))
         card.starting_bid = float(request.form.get('starting_bid', 0.50))
         card.notes = request.form.get('notes')
+        card.private_notes = request.form.get('private_notes')
+        card.foil = request.form.get('foil')
         card.is_graded = request.form.get('is_graded') == 'on'
+
+        # Only update images if new ones are provided
+        if request.form.get('image_front'):
+            card.image_front = request.form.get('image_front')
+        if request.form.get('image_back'):
+            card.image_back = request.form.get('image_back')
 
         if card.is_graded:
             card.grading_company = request.form.get('grading_company')
@@ -242,6 +337,25 @@ def daily_report():
     report['shipping_count'] = len(report['needs_shipping'])
 
     return render_template('report.html', report=report)
+
+
+@app.route('/listings/<int:listing_id>/preview')
+def preview_listing(listing_id):
+    """Preview auction details before posting."""
+    listing = Listing.query.get_or_404(listing_id)
+    card = listing.card
+
+    # Get shipping options and recommendation from settings
+    shipping_options = get_shipping_options()
+    recommended_shipping = get_recommended_shipping(card.starting_bid)
+
+    return render_template('preview_listing.html',
+                           listing=listing,
+                           card=card,
+                           title=card.title(),
+                           description=card.generate_description(shipping_options),
+                           shipping_options=shipping_options,
+                           recommended_shipping=recommended_shipping)
 
 
 @app.route('/cards/<int:card_id>/delete', methods=['POST'])
@@ -363,49 +477,99 @@ Then provide:
 
 Be concise and direct. Focus on what matters for selling."""
 
-    try:
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=500,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_data
+    # Retry logic: 3 attempts with 3 seconds between each
+    max_attempts = 3
+    last_error = None
+
+    for attempt in range(max_attempts):
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=500,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": image_data
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
                             }
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ]
-                }
-            ]
-        )
+                        ]
+                    }
+                ]
+            )
 
-        assessment = response.content[0].text
+            assessment = response.content[0].text
 
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'filepath': filepath,
-            'condition_check': assessment
-        })
+            return jsonify({
+                'success': True,
+                'filename': filename,
+                'filepath': filepath,
+                'condition_check': assessment
+            })
 
-    except Exception as e:
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'filepath': filepath,
-            'condition_check': None,
-            'error': f'Condition check failed: {str(e)}'
-        })
+        except Exception as e:
+            last_error = e
+            if attempt < max_attempts - 1:
+                time.sleep(3)  # Wait 3 seconds before retrying
+
+    return jsonify({
+        'success': True,
+        'filename': filename,
+        'filepath': filepath,
+        'condition_check': None,
+        'error': f'Condition check failed after {max_attempts} attempts: {str(last_error)}'
+    })
+
+
+@app.route('/settings')
+def settings():
+    """View and edit application settings."""
+    current_settings = load_settings()
+    return render_template('settings.html', settings=current_settings)
+
+
+@app.route('/settings/shipping', methods=['POST'])
+def update_shipping_settings():
+    """Update shipping settings."""
+    current_settings = load_settings()
+
+    # Update thresholds
+    current_settings['shipping_thresholds'] = {
+        'economy_max': float(request.form.get('economy_max', 19.99)),
+        'standard_max': float(request.form.get('standard_max', 49.99)),
+        'insured_100_max': float(request.form.get('insured_100_max', 99.99))
+    }
+
+    # Update shipping options prices and costs
+    for i, opt in enumerate(current_settings['shipping_options']):
+        price_key = f'option_{i}_price'
+        cost_key = f'option_{i}_cost'
+        if price_key in request.form:
+            current_settings['shipping_options'][i]['price'] = float(request.form[price_key])
+        if cost_key in request.form:
+            current_settings['shipping_options'][i]['cost'] = float(request.form[cost_key])
+
+    save_settings(current_settings)
+    flash('Shipping settings updated successfully', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/reset', methods=['POST'])
+def reset_settings():
+    """Reset settings to defaults."""
+    save_settings(get_default_settings())
+    flash('Settings reset to defaults', 'success')
+    return redirect(url_for('settings'))
 
 
 # Create tables on startup

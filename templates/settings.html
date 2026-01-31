@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - eBay Card Sales{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+</div>
+
+<div class="settings-container">
+    <form method="post" action="{{ url_for('update_shipping_settings') }}">
+        <div class="settings-section">
+            <h2>Shipping Recommendation Thresholds</h2>
+            <p class="section-description">Set the sale price thresholds for shipping recommendations.</p>
+
+            <div class="threshold-grid">
+                <div class="threshold-item">
+                    <label for="economy_max">Economy (no tracking) up to:</label>
+                    <div class="input-group">
+                        <span class="input-prefix">$</span>
+                        <input type="number" name="economy_max" id="economy_max"
+                               value="{{ settings.shipping_thresholds.economy_max }}"
+                               step="0.01" min="0">
+                    </div>
+                    <small>Sales above this use Standard shipping</small>
+                </div>
+
+                <div class="threshold-item">
+                    <label for="standard_max">Standard (tracked, no insurance) up to:</label>
+                    <div class="input-group">
+                        <span class="input-prefix">$</span>
+                        <input type="number" name="standard_max" id="standard_max"
+                               value="{{ settings.shipping_thresholds.standard_max }}"
+                               step="0.01" min="0">
+                    </div>
+                    <small>Sales above this use Insured ($100) shipping</small>
+                </div>
+
+                <div class="threshold-item">
+                    <label for="insured_100_max">Insured up to $100, for sales up to:</label>
+                    <div class="input-group">
+                        <span class="input-prefix">$</span>
+                        <input type="number" name="insured_100_max" id="insured_100_max"
+                               value="{{ settings.shipping_thresholds.insured_100_max }}"
+                               step="0.01" min="0">
+                    </div>
+                    <small>Sales above this use Insured ($250) shipping</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>Shipping Options</h2>
+            <p class="section-description">Configure pricing for each shipping option. These prices appear in auction descriptions.</p>
+
+            <table class="settings-table">
+                <thead>
+                    <tr>
+                        <th>Option</th>
+                        <th>Method</th>
+                        <th>Tracking</th>
+                        <th>Insurance</th>
+                        <th>Buyer Pays</th>
+                        <th>Your Cost</th>
+                        <th>Margin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for opt in settings.shipping_options %}
+                    <tr>
+                        <td><strong>{{ opt.name }}</strong></td>
+                        <td>{{ opt.method }}</td>
+                        <td>{{ "Yes" if opt.tracking else "No" }}</td>
+                        <td>{{ "Yes" if opt.insurance else "No" }}{% if opt.insurance_limit %} (up to ${{ opt.insurance_limit }}){% endif %}</td>
+                        <td>
+                            <div class="input-group input-small">
+                                <span class="input-prefix">$</span>
+                                <input type="number" name="option_{{ loop.index0 }}_price"
+                                       value="{{ opt.price }}" step="0.01" min="0" class="price-input"
+                                       data-index="{{ loop.index0 }}">
+                            </div>
+                        </td>
+                        <td>
+                            <div class="input-group input-small">
+                                <span class="input-prefix">$</span>
+                                <input type="number" name="option_{{ loop.index0 }}_cost"
+                                       value="{{ opt.cost }}" step="0.01" min="0" class="cost-input"
+                                       data-index="{{ loop.index0 }}">
+                            </div>
+                        </td>
+                        <td class="margin-cell" data-index="{{ loop.index0 }}">
+                            ${{ "%.2f"|format(opt.price - opt.cost) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="settings-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <a href="{{ url_for('index') }}" class="btn">Cancel</a>
+        </div>
+    </form>
+
+    <div class="settings-section danger-zone">
+        <h2>Reset to Defaults</h2>
+        <p class="section-description">This will reset all settings to their default values.</p>
+        <form method="post" action="{{ url_for('reset_settings') }}" onsubmit="return confirm('Reset all settings to defaults?')">
+            <button type="submit" class="btn btn-danger">Reset All Settings</button>
+        </form>
+    </div>
+</div>
+
+<style>
+.settings-container {
+    max-width: 900px;
+}
+
+.settings-section {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.settings-section h2 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.1rem;
+}
+
+.section-description {
+    color: #666;
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+}
+
+.threshold-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.threshold-item label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.threshold-item small {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+.input-group {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+}
+
+.input-prefix {
+    padding: 0.5rem;
+    background: #eee;
+    border-right: 1px solid #ccc;
+    color: #666;
+}
+
+.input-group input {
+    border: none;
+    padding: 0.5rem;
+    width: 100px;
+    border-radius: 0 4px 4px 0;
+}
+
+.input-small {
+    display: inline-flex;
+}
+
+.input-small input {
+    width: 70px;
+}
+
+.settings-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.settings-table th,
+.settings-table td {
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.settings-table th {
+    background: #eee;
+    font-weight: 500;
+}
+
+.margin-cell {
+    font-weight: 500;
+    color: #2e7d32;
+}
+
+.settings-actions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.danger-zone {
+    border-color: #f44336;
+    background: #fff5f5;
+}
+
+.danger-zone h2 {
+    color: #c62828;
+}
+
+.btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d32f2f;
+}
+</style>
+
+<script>
+// Update margin display when price or cost changes
+document.querySelectorAll('.price-input, .cost-input').forEach(input => {
+    input.addEventListener('input', function() {
+        const index = this.dataset.index;
+        const priceInput = document.querySelector(`.price-input[data-index="${index}"]`);
+        const costInput = document.querySelector(`.cost-input[data-index="${index}"]`);
+        const marginCell = document.querySelector(`.margin-cell[data-index="${index}"]`);
+
+        const price = parseFloat(priceInput.value) || 0;
+        const cost = parseFloat(costInput.value) || 0;
+        const margin = price - cost;
+
+        marginCell.textContent = '$' + margin.toFixed(2);
+        marginCell.style.color = margin >= 0 ? '#2e7d32' : '#c62828';
+    });
+});
+</script>
+{% endblock %}

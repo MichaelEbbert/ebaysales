@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+
+{% block title %}Preview Listing - eBay Card Sales{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Preview Auction</h1>
+    <a href="{{ url_for('list_cards') }}" class="btn">Back to Cards</a>
+</div>
+
+<div class="preview-container">
+    <div class="preview-section">
+        <h2>Listing Title</h2>
+        <div class="preview-box title-preview">
+            {{ title }}
+        </div>
+        <small class="char-count">{{ title|length }} / 80 characters</small>
+    </div>
+
+    <div class="preview-section">
+        <h2>Description</h2>
+        <div class="preview-box description-preview">
+            {{ description|replace('\n', '<br>')|safe }}
+        </div>
+    </div>
+
+    <div class="preview-row">
+        <div class="preview-section">
+            <h2>Auction Details</h2>
+            <div class="preview-box">
+                <table class="details-table">
+                    <tr>
+                        <th>Starting Bid:</th>
+                        <td>${{ "%.2f"|format(card.starting_bid) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Quantity:</th>
+                        <td>{{ card.quantity }}</td>
+                    </tr>
+                    <tr>
+                        <th>Duration:</th>
+                        <td>7 days</td>
+                    </tr>
+                    <tr>
+                        <th>Scheduled End:</th>
+                        <td>{{ listing.scheduled_end_time.strftime('%B %d, %Y at %I:%M %p') if listing.scheduled_end_time else 'Not set' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <h2>Shipping Options (Buyer Selects)</h2>
+            <div class="preview-box">
+                <table class="shipping-table">
+                    <thead>
+                        <tr>
+                            <th>Option</th>
+                            <th>Method</th>
+                            <th>Tracking</th>
+                            <th>Insurance</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for opt in shipping_options %}
+                        <tr{% if opt.name == recommended_shipping.name %} class="recommended"{% endif %}>
+                            <td>{{ opt.name }}{% if opt.name == recommended_shipping.name %} <span class="rec-badge">Recommended</span>{% endif %}</td>
+                            <td>{{ opt.method }}</td>
+                            <td>{{ "Yes" if opt.tracking else "No" }}</td>
+                            <td>{{ "Yes" if opt.insurance else "No" }}</td>
+                            <td>${{ "%.2f"|format(opt.price) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="preview-section">
+        <h2>Packing Instructions (for you)</h2>
+        <div class="preview-box packing-box">
+            <div class="packing-recommendation">
+                <strong>Recommended for this listing:</strong> {{ recommended_shipping.name }}
+            </div>
+            <table class="details-table">
+                <tr>
+                    <th>Packing method:</th>
+                    <td>{{ recommended_shipping.packing }}</td>
+                </tr>
+                <tr>
+                    <th>Label size:</th>
+                    <td>{{ recommended_shipping.label_size or "N/A (use stamp)" }}</td>
+                </tr>
+                <tr>
+                    <th>Estimated weight:</th>
+                    <td>~{{ "%.1f"|format(0.8 + (card.quantity * 0.1)) }} oz</td>
+                </tr>
+                <tr>
+                    <th>Your cost:</th>
+                    <td>${{ "%.2f"|format(recommended_shipping.cost) }}</td>
+                </tr>
+                <tr>
+                    <th>Buyer pays:</th>
+                    <td>${{ "%.2f"|format(recommended_shipping.price) }}</td>
+                </tr>
+                <tr>
+                    <th>Shipping margin:</th>
+                    <td>${{ "%.2f"|format(recommended_shipping.price - recommended_shipping.cost) }}</td>
+                </tr>
+            </table>
+
+            <div class="packing-steps">
+                <strong>Packing steps:</strong>
+                <ol>
+                    {% if recommended_shipping.tracking %}
+                    <li>Place card in penny sleeve (if not already sleeved)</li>
+                    <li>Insert sleeved card into top loader</li>
+                    <li>Secure top loader with ding protector</li>
+                    <li>Place in bubble mailer (7" x 4.75")</li>
+                    <li>Print 4" x 6" label from eBay</li>
+                    <li>Affix label to front of bubble mailer</li>
+                    {% else %}
+                    <li>Place card in penny sleeve (if not already sleeved)</li>
+                    <li>Insert sleeved card into top loader</li>
+                    <li>Sandwich between cardboard stiffeners</li>
+                    <li>Place in #10 envelope</li>
+                    <li>Mark envelope "Non-Machinable"</li>
+                    <li>Apply forever stamp</li>
+                    {% endif %}
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="preview-section">
+        <h2>Images</h2>
+        <div class="preview-images">
+            {% if card.image_front %}
+            <div class="preview-image">
+                <img src="{{ url_for('uploaded_file', filename=card.image_front) }}" alt="Front">
+                <span>Front</span>
+            </div>
+            {% else %}
+            <div class="preview-image no-image">
+                <div class="no-image-placeholder">No front image</div>
+                <span>Front</span>
+            </div>
+            {% endif %}
+            {% if card.image_back %}
+            <div class="preview-image">
+                <img src="{{ url_for('uploaded_file', filename=card.image_back) }}" alt="Back">
+                <span>Back</span>
+            </div>
+            {% else %}
+            <div class="preview-image no-image">
+                <div class="no-image-placeholder">No back image</div>
+                <span>Back</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="preview-actions">
+        {% if listing.status == 'draft' %}
+        <form method="post" action="{{ url_for('update_listing_status', listing_id=listing.id) }}" style="display:inline">
+            <input type="hidden" name="status" value="listed">
+            <button type="submit" class="btn btn-primary btn-large">Create Auction on eBay</button>
+        </form>
+        {% else %}
+        <span class="status-badge {{ listing.status }}">Status: {{ listing.status }}</span>
+        {% endif %}
+        <a href="{{ url_for('edit_card', card_id=card.id) }}" class="btn">Edit Card</a>
+        <a href="{{ url_for('list_cards') }}" class="btn">Cancel</a>
+    </div>
+</div>
+
+<style>
+.preview-container {
+    max-width: 800px;
+}
+
+.preview-section {
+    margin-bottom: 1.5rem;
+}
+
+.preview-section h2 {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.preview-box {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+.title-preview {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+.char-count {
+    color: #888;
+}
+
+.description-preview {
+    white-space: pre-wrap;
+    line-height: 1.6;
+}
+
+.preview-row {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.preview-row .preview-section {
+    flex: 1;
+}
+
+.details-table {
+    width: 100%;
+    border: none;
+}
+
+.details-table th {
+    text-align: left;
+    padding: 0.25rem 0;
+    font-weight: normal;
+    color: #666;
+}
+
+.details-table td {
+    text-align: right;
+    padding: 0.25rem 0;
+}
+
+.preview-images {
+    display: flex;
+    gap: 1rem;
+}
+
+.preview-image {
+    text-align: center;
+}
+
+.preview-image img {
+    max-width: 200px;
+    max-height: 280px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.preview-image span {
+    display: block;
+    margin-top: 0.5rem;
+    color: #666;
+}
+
+.no-image-placeholder {
+    width: 200px;
+    height: 280px;
+    border: 2px dashed #ccc;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    background: #f9f9f9;
+}
+
+.preview-actions {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #ddd;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-large {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+}
+
+.shipping-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.shipping-table th,
+.shipping-table td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.shipping-table tr.recommended {
+    background: #e8f5e9;
+}
+
+.rec-badge {
+    background: #4caf50;
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+}
+
+.packing-box {
+    background: #fff8e1;
+}
+
+.packing-recommendation {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.packing-steps {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ddd;
+}
+
+.packing-steps ol {
+    margin: 0.5rem 0 0 1.5rem;
+    padding: 0;
+}
+
+.packing-steps li {
+    margin-bottom: 0.25rem;
+}
+</style>
+{% endblock %}

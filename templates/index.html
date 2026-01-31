@@ -128,7 +128,7 @@
         <tbody>
             {% for listing in drafts %}
             <tr>
-                <td>{{ listing.card.title() }}</td>
+                <td><a href="{{ url_for('preview_listing', listing_id=listing.id) }}">{{ listing.card.title() }}</a></td>
                 <td>${{ "%.2f"|format(listing.card.starting_bid) }}</td>
                 <td>{{ listing.scheduled_end_time.strftime('%a %b %d %I:%M %p') if listing.scheduled_end_time else 'TBD' }}</td>
             </tr>

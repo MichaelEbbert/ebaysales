@@ -1,0 +1,53 @@
+{
+    "shipping_options": [
+        {
+            "name": "Economy",
+            "method": "Stamped envelope",
+            "tracking": false,
+            "insurance": false,
+            "insurance_limit": null,
+            "price": 1.00,
+            "cost": 0.75,
+            "label_size": null,
+            "packing": "#10 envelope with top loader and cardboard stiffener"
+        },
+        {
+            "name": "Standard",
+            "method": "Bubble mailer",
+            "tracking": true,
+            "insurance": false,
+            "insurance_limit": null,
+            "price": 4.50,
+            "cost": 4.00,
+            "label_size": "4\" x 6\"",
+            "packing": "Bubble mailer with top loader and ding protector"
+        },
+        {
+            "name": "Insured (up to $100)",
+            "method": "Bubble mailer",
+            "tracking": true,
+            "insurance": true,
+            "insurance_limit": 100,
+            "price": 6.50,
+            "cost": 4.90,
+            "label_size": "4\" x 6\"",
+            "packing": "Bubble mailer with top loader and ding protector"
+        },
+        {
+            "name": "Insured (up to $250)",
+            "method": "Bubble mailer",
+            "tracking": true,
+            "insurance": true,
+            "insurance_limit": 250,
+            "price": 8.50,
+            "cost": 5.75,
+            "label_size": "4\" x 6\"",
+            "packing": "Bubble mailer with top loader and ding protector"
+        }
+    ],
+    "shipping_thresholds": {
+        "economy_max": 19.99,
+        "standard_max": 49.99,
+        "insured_100_max": 99.99
+    }
+}

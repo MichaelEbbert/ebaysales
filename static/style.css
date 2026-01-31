@@ -392,6 +392,17 @@ tr:hover {
     margin-bottom: 0.5rem;
 }
 
+.current-image {
+    margin-bottom: 0.5rem;
+}
+
+.current-image img {
+    max-width: 150px;
+    max-height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
 .upload-buttons {
     display: flex;
     gap: 0.5rem;

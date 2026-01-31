@@ -68,12 +68,34 @@ The app automatically crops scans to the card dimensions:
   - Based on actual usage: ~500 input tokens + ~70 output tokens per check
   - Sonnet pricing: $3/M input, $15/M output
 
+### UI Guidelines
+- No placeholder text in any form fields
+
 ### Form Field Notes
-- **Card Name** (Sports): Use for extras like "RC", "/199", "Refractor", "Auto", "SP"
-- **Card Name** (MTG/Pokemon): The actual card name (e.g., "Charizard", "Black Lotus")
+- **Additional Details** (Sports): Use for extras like "RC", "/199", "Refractor", "Auto", "SP"
+- **Additional Details** (MTG/Pokemon): The actual card name (e.g., "Charizard", "Black Lotus")
 - **Player Name / Year**: Sports cards only
 - **Set / Product**: e.g., "Topps Chrome", "Base Set", "Prizm"
-- **Card Number**: e.g., "175", "4/102"
+- **Card Number**: e.g., "175", "4/102" (hidden for MTG)
+- **Foil**: MTG and Pokemon only (Non-Foil / Foil)
+- **Public Notes**: Shown in auction description
+- **Private Notes**: Internal only (cost tracking, inventory location, etc.)
+
+### Listing Title Conventions
+- **MTG cards**: Always start with "MTG" prefix (e.g., "MTG Revised Underground Sea Dual Land x1 LP")
+- **Dual lands**: Revised/Unlimited/Beta/Alpha dual lands automatically include "Dual Land" in title
+- **Quantity**: Shown as "x1", "x2", etc.
+
+### Shipping Options
+Buyer-selectable at checkout, configured in Settings:
+| Option | Method | Tracking | Insurance | Default Price |
+|--------|--------|----------|-----------|---------------|
+| Economy | Stamped #10 envelope | No | No | $1.00 |
+| Standard | Bubble mailer | Yes | No | $4.50 |
+| Insured (up to $100) | Bubble mailer | Yes | Yes | $6.50 |
+| Insured (up to $250) | Bubble mailer | Yes | Yes | $8.50 |
+
+Thresholds for shipping recommendations configurable in Settings page.
 
 ### API Accounts Required
 1. **Anthropic API** (console.anthropic.com) - For condition checking
@@ -90,7 +112,6 @@ The app automatically crops scans to the card dimensions:
 
 1. Install dependencies:
    ```
-   cd D:\claude_projects\ebaysales
    pip install -r requirements.txt
    ```
 
@@ -137,6 +158,11 @@ python cleanup.py --orphans-only
 - [x] Image upload with auto-crop (fixed dimensions for penny-sleeved cards)
 - [x] Claude Vision API condition checking
 - [x] Cleanup script for old images (90 days after shipping)
+- [x] Auction preview page with auto-generated title and description
+- [x] Buyer-selectable shipping options with packing instructions
+- [x] Settings page for shipping thresholds and pricing
+- [x] Foil support for MTG and Pokemon cards
+- [x] Public/Private notes separation
 
 ### Pending (waiting on eBay developer account approval)
 - [ ] eBay API integration
